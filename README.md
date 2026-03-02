@@ -4,8 +4,6 @@
 
 ## 特性
 
-- 单命令安装：`curl ... | bash`
-- 自动下载模板：`docker-compose-template.yml`、`nginx.conf`
 - 交互式配置（精简提问）
 - 自动启动容器：`docker-compose up -d` / `docker compose up -d`
 - 自动安装并配置 Nginx 反向代理
