@@ -299,14 +299,10 @@ fi
 
 DOMAIN_HOST="$(printf '%s' "$NEXT_PUBLIC_GATEWAY_URL" | sed -E 's#^[a-zA-Z]+://##' | sed -E 's#/.*$##')"
 DOMAIN_HOST="$(printf '%s' "$DOMAIN_HOST" | sed -E 's#:[0-9]+$##')"
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
-CLERK_SECRET_KEY=""
 
 echo
 echo "以下配置将使用默认值"
 echo "- NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}"
-echo "- NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: (空)"
-echo "- CLERK_SECRET_KEY: (空)"
 echo "- TZ: Asia/Shanghai"
 echo "- FRONT_PORT: 2323"
 echo "- APP_PORT: 2333"
@@ -342,8 +338,6 @@ rendered_content="$({
   cat "$TEMPLATE_FILE" | sed \
     -e "s|__NEXT_PUBLIC_API_URL__|$(escape_sed_replacement "$NEXT_PUBLIC_API_URL")|g" \
     -e "s|__NEXT_PUBLIC_GATEWAY_URL__|$(escape_sed_replacement "$NEXT_PUBLIC_GATEWAY_URL")|g" \
-    -e "s|__NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY__|$(escape_sed_replacement "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY")|g" \
-    -e "s|__CLERK_SECRET_KEY__|$(escape_sed_replacement "$CLERK_SECRET_KEY")|g" \
     -e "s|__TMDB_API_KEY__|$(escape_sed_replacement "$TMDB_API_KEY")|g" \
     -e "s|__GH_TOKEN__|$(escape_sed_replacement "$GH_TOKEN")|g" \
     -e "s|__ALLOWED_ORIGINS__|$(escape_sed_replacement "$ALLOWED_ORIGINS")|g" \

@@ -29,8 +29,6 @@ curl -fsSL https://raw.githubusercontent.com/liyown/shiroi-deploy/main/install.s
 ## 自动默认配置
 
 - `NEXT_PUBLIC_API_URL=<主域名>/api/v2`
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=`（空）
-- `CLERK_SECRET_KEY=`（空）
 - `TZ=Asia/Shanghai`
 - `FRONT_PORT=2323`
 - `APP_PORT=2333`
