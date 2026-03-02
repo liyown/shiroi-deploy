@@ -61,7 +61,7 @@ ask_with_default() {
   local default_value="$2"
   local value
   read -r -p "$prompt [默认: $default_value]: " value
-  value="${value//[$'\t\r\n']}"
+  value="$(printf '%s' "$value" | tr -d '\r\n')"
   if [[ -z "$value" ]]; then
     value="$default_value"
   fi
@@ -73,6 +73,7 @@ ask_secret() {
   local value=""
   while [[ -z "$value" ]]; do
     read -r -s -p "$prompt: " value
+    value="$(printf '%s' "$value" | tr -d '\r\n')"
     echo
     if [[ -z "$value" ]]; then
       echo "输入不能为空，请重新输入。"
@@ -100,65 +101,73 @@ else
 fi
 
 echo
-echo "[1/10] NEXT_PUBLIC_API_URL"
-echo "作用: 前端请求后端 API 的基础地址。"
-echo "获取方式: 使用你部署网关对外暴露的 API 路径，例如 https://your-domain.com/api/v2。"
-NEXT_PUBLIC_API_URL="$(ask_with_default "请输入 NEXT_PUBLIC_API_URL" "https://example.com/api/v2")"
-
-echo
-echo "[2/10] NEXT_PUBLIC_GATEWAY_URL"
+echo "[1/4] 域名配置"
 echo "作用: 前端网关根地址，用于拼接站点级链接和部分跳转。"
 echo "获取方式: 填写站点主域名（不带末尾斜杠），例如 https://your-domain.com。"
-NEXT_PUBLIC_GATEWAY_URL="$(ask_with_default "请输入 NEXT_PUBLIC_GATEWAY_URL" "https://example.com")"
+echo "说明: API 地址将自动使用 <域名>/api/v2，端口将自动使用默认值。"
+NEXT_PUBLIC_GATEWAY_URL="$(ask_with_default "请输入主域名 NEXT_PUBLIC_GATEWAY_URL" "https://example.com")"
+NEXT_PUBLIC_GATEWAY_URL="${NEXT_PUBLIC_GATEWAY_URL%/}"
+NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_GATEWAY_URL}/api/v2"
 
 echo
-echo "[3/10] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
-echo "作用: Clerk 前端公开密钥，用于登录组件初始化。"
-echo "获取方式: Clerk Dashboard -> API Keys -> Publishable key（通常以 pk_ 开头）。"
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="$(ask_with_default "请输入 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" "pk_live_xxx")"
-
-echo
-echo "[4/10] CLERK_SECRET_KEY"
-echo "作用: Clerk 服务端密钥，用于服务端鉴权与会话校验。"
-echo "获取方式: Clerk Dashboard -> API Keys -> Secret key（通常以 sk_ 开头）。"
-CLERK_SECRET_KEY="$(ask_secret "请输入 CLERK_SECRET_KEY（隐藏输入）")"
-
-echo
-echo "[5/10] TMDB_API_KEY"
+echo "[2/4] TMDB_API_KEY"
 echo "作用: 访问 TMDB 数据接口。"
 echo "获取方式: TMDB 账号后台申请 API Key。"
 TMDB_API_KEY="$(ask_secret "请输入 TMDB_API_KEY（隐藏输入）")"
 
 echo
-echo "[6/10] GH_TOKEN"
+echo "[3/4] GH_TOKEN"
 echo "作用: 访问 GitHub API（若你的功能依赖私有仓库或更高限额）。"
 echo "获取方式: GitHub Settings -> Developer settings -> Personal access tokens。"
 GH_TOKEN="$(ask_secret "请输入 GH_TOKEN（隐藏输入）")"
 
 echo
-echo "[7/10] ALLOWED_ORIGINS"
+echo "[4/4] JWT_SECRET"
+echo "作用: 用于签发和校验 JWT 的核心密钥。"
+echo "获取方式: 可直接回车自动生成，或手动填写 32+ 位高强度随机字符串。"
+read -r -s -p "请输入 JWT_SECRET（隐藏输入，回车自动生成）: " JWT_SECRET
+echo
+if [[ -z "$JWT_SECRET" ]]; then
+  if command -v openssl >/dev/null 2>&1; then
+    JWT_SECRET="$(openssl rand -hex 32)"
+  else
+    JWT_SECRET="$(date +%s | shasum | awk '{print $1}')$(date +%s | shasum | awk '{print $1}' | cut -c1-24)"
+  fi
+  echo "已自动生成 JWT_SECRET。"
+fi
+
+DOMAIN_HOST="$(printf '%s' "$NEXT_PUBLIC_GATEWAY_URL" | sed -E 's#^[a-zA-Z]+://##' | sed -E 's#/.*$##')"
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=""
+CLERK_SECRET_KEY=""
+
+echo
+echo "以下配置将使用默认值"
+echo "- NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}"
+echo "- NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: (空)"
+echo "- CLERK_SECRET_KEY: (空)"
+echo "- TZ: Asia/Shanghai"
+echo "- FRONT_PORT: 2323"
+echo "- APP_PORT: 2333"
+echo "- ALLOWED_ORIGINS: ${DOMAIN_HOST},www.${DOMAIN_HOST}"
+
+echo
+echo "[默认] ALLOWED_ORIGINS"
 echo "作用: 后端允许跨域访问的来源白名单。"
 echo "获取方式: 填写前端访问域名，多个值用英文逗号分隔，例如 a.com,b.com,www.b.com。"
-ALLOWED_ORIGINS="$(ask_with_default "请输入 ALLOWED_ORIGINS" "example.com,www.example.com")"
+ALLOWED_ORIGINS="${DOMAIN_HOST},www.${DOMAIN_HOST}"
+TZ="Asia/Shanghai"
+FRONT_PORT="2323"
+APP_PORT="2333"
 
-echo
-echo "[8/10] JWT_SECRET"
-echo "作用: 用于签发和校验 JWT 的核心密钥。"
-echo "获取方式: 使用高强度随机字符串（建议 32+ 位），可用 openssl rand -hex 32 生成。"
-JWT_SECRET="$(ask_secret "请输入 JWT_SECRET（隐藏输入）")"
-
-echo
-echo "[9/10] TZ"
-echo "作用: 容器时区配置。"
-echo "获取方式: 使用标准时区标识，例如 Asia/Shanghai、America/Los_Angeles。"
-TZ="$(ask_with_default "请输入 TZ" "Asia/Shanghai")"
-
-echo
-echo "[10/10] 端口配置"
-echo "作用: 将容器端口映射到主机。"
-echo "获取方式: 选择主机上未被占用的端口。"
-FRONT_PORT="$(ask_with_default "请输入前端映射端口 FRONT_PORT" "2323")"
-APP_PORT="$(ask_with_default "请输入后端映射端口 APP_PORT" "2333")"
+NEXT_PUBLIC_API_URL="$(printf '%s' "$NEXT_PUBLIC_API_URL" | tr -d '\r\n')"
+NEXT_PUBLIC_GATEWAY_URL="$(printf '%s' "$NEXT_PUBLIC_GATEWAY_URL" | tr -d '\r\n')"
+TMDB_API_KEY="$(printf '%s' "$TMDB_API_KEY" | tr -d '\r\n')"
+GH_TOKEN="$(printf '%s' "$GH_TOKEN" | tr -d '\r\n')"
+JWT_SECRET="$(printf '%s' "$JWT_SECRET" | tr -d '\r\n')"
+ALLOWED_ORIGINS="$(printf '%s' "$ALLOWED_ORIGINS" | tr -d '\r\n')"
+TZ="$(printf '%s' "$TZ" | tr -d '\r\n')"
+FRONT_PORT="$(printf '%s' "$FRONT_PORT" | tr -d '\r\n')"
+APP_PORT="$(printf '%s' "$APP_PORT" | tr -d '\r\n')"
 
 rendered_content="$({
   cat "$TEMPLATE_FILE" | sed \

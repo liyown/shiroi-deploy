@@ -1,0 +1,81 @@
+x-default-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+    tag: "{{.Name}}"
+services:
+  front:
+    container_name: mx-server-fronted
+    image: ghcr.io/liyown/shiroi:latest
+    environment:
+      - PORT=2323
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=compose/api/v2
+      - NEXT_PUBLIC_GATEWAY_URL=compose
+      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+      - CLERK_SECRET_KEY=
+      - NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+      - NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+      - NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+      - ENABLE_EXPERIMENTAL_COREPACK=1
+      - TMDB_API_KEY=compose
+      - GH_TOKEN=compose
+    ports:
+      - '2323:2323'
+    restart: unless-stopped
+  app:
+    container_name: mx-server
+    image: innei/mx-server:latest
+    environment:
+      - TZ=Asia/Shanghai
+      - NODE_ENV=production
+      - DB_HOST=mongo
+      - REDIS_HOST=redis
+      - ALLOWED_ORIGINS=compose,www.compose
+      - JWT_SECRET=compose
+    volumes:
+      - ./data/mx-space:/root/.mx-space
+    ports:
+      - '2333:2333'
+    depends_on:
+      - mongo
+      - redis
+    networks:
+      - mx-space
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:2333/api/v2/ping']
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+
+  mongo:
+    container_name: mongo
+    image: mongo:7.0
+    volumes:
+      - ./data/db:/data/db
+    networks:
+      - mx-space
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    networks:
+      - mx-space
+    restart: unless-stopped
+
+networks:
+  mx-space:
+    driver: bridge
