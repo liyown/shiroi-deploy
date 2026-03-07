@@ -11,6 +11,7 @@ NGINX_TEMPLATE_URL_DEFAULT="https://raw.githubusercontent.com/liyown/shiroi-depl
 NGINX_TEMPLATE_URL="${NGINX_TEMPLATE_URL:-$NGINX_TEMPLATE_URL_DEFAULT}"
 FORCE_TEMPLATE_DOWNLOAD="false"
 SUDO=""
+TTY_DEVICE="/dev/tty"
 
 if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
   if command -v sudo >/dev/null 2>&1; then
@@ -213,7 +214,8 @@ ask_with_default() {
   local prompt="$1"
   local default_value="$2"
   local value
-  read -r -p "$prompt [默认: $default_value]: " value
+  printf "%s [默认: %s]: " "$prompt" "$default_value" > "$TTY_DEVICE"
+  IFS= read -r value < "$TTY_DEVICE"
   value="$(printf '%s' "$value" | tr -d '\r\n')"
   if [[ -z "$value" ]]; then
     value="$default_value"
@@ -225,13 +227,24 @@ ask_secret() {
   local prompt="$1"
   local value=""
   while [[ -z "$value" ]]; do
-    read -r -s -p "$prompt: " value
+    printf "%s: " "$prompt" > "$TTY_DEVICE"
+    IFS= read -r -s value < "$TTY_DEVICE"
     value="$(printf '%s' "$value" | tr -d '\r\n')"
-    echo
+    echo > "$TTY_DEVICE"
     if [[ -z "$value" ]]; then
-      echo "输入不能为空，请重新输入。"
+      echo "输入不能为空，请重新输入。" > "$TTY_DEVICE"
     fi
   done
+  printf '%s' "$value"
+}
+
+ask_secret_optional() {
+  local prompt="$1"
+  local value
+  printf "%s: " "$prompt" > "$TTY_DEVICE"
+  IFS= read -r -s value < "$TTY_DEVICE"
+  echo > "$TTY_DEVICE"
+  value="$(printf '%s' "$value" | tr -d '\r\n')"
   printf '%s' "$value"
 }
 
@@ -243,6 +256,12 @@ echo "=============================================="
 echo "Shiroi 安装向导 (Bash)"
 echo "将自动下载模板，按你的输入生成 docker-compose.yml 并启动"
 echo "=============================================="
+
+if [[ ! -e "$TTY_DEVICE" ]]; then
+  echo "错误: 未检测到交互终端（$TTY_DEVICE）。请在交互式 SSH 终端执行此脚本。" >&2
+  echo "建议命令: curl -fsSL <install.sh-url> | bash" >&2
+  exit 1
+fi
 
 if [[ ! -f "$TEMPLATE_FILE" || "$FORCE_TEMPLATE_DOWNLOAD" == "true" ]]; then
   echo "正在下载 Compose 模板: $TEMPLATE_URL"
@@ -286,8 +305,7 @@ echo
 echo "[4/4] JWT_SECRET"
 echo "作用: 用于签发和校验 JWT 的核心密钥。"
 echo "获取方式: 可直接回车自动生成，或手动填写 32+ 位高强度随机字符串。"
-read -r -s -p "请输入 JWT_SECRET（隐藏输入，回车自动生成）: " JWT_SECRET
-echo
+JWT_SECRET="$(ask_secret_optional "请输入 JWT_SECRET（隐藏输入，回车自动生成）")"
 if [[ -z "$JWT_SECRET" ]]; then
   if command -v openssl >/dev/null 2>&1; then
     JWT_SECRET="$(openssl rand -hex 32)"
